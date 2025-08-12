@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Revolt Bot</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Revolt Bot</h1>
+        <div id="chat-box"></div>
+        <div class="controls">
+            <button id="start-btn">Start Listening</button>
+            <button id="stop-btn" disabled>Stop Listening</button>
+        </div>
+    </div>
+
+    <script>
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const chatBox = document.getElementById('chat-box');
+
+        let socket;
+        let mediaRecorder;
+        let audioChunks = [];
+
+        startBtn.addEventListener('click', () => {
+            socket = new WebSocket('ws://localhost:3000');
+
+            socket.onopen = () => {
+                console.log('WebSocket connection established');
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                startRecording();
+            };
+
+            socket.onmessage = (event) => {
+                const message = event.data;
+                const p = document.createElement('p');
+                p.textContent = `Bot: ${message}`;
+                chatBox.appendChild(p);
+            };
+
+            socket.onclose = () => {
+                console.log('WebSocket connection closed');
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            };
+
+            socket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        });
+
+        stopBtn.addEventListener('click', () => {
+            stopRecording();
+            socket.close();
+        });
+
+        function startRecording() {
+            navigator.mediaDevices.getUserMedia({
+                    audio: true
+                })
+                .then(stream => {
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.start();
+
+                    mediaRecorder.ondataavailable = (event) => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, {
+                            type: 'audio/webm'
+                        });
+                        audioChunks = [];
+                        // In a real application, you would send the audioBlob directly.
+                        // For this simplified example, we'll send a text representation.
+                        socket.send("User is speaking...");
+                    };
+                })
+                .catch(error => console.error('Error accessing microphone:', error));
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+        }
+    </script>
+</body>
+
+</html>
